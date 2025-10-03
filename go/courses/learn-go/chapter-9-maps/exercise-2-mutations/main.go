@@ -1,0 +1,180 @@
+package main
+
+import (
+	"errors"
+	"fmt"
+)
+
+func deleteIfNecessary(users map[string]user, name string) (deleted bool, err error) {
+	// ?
+	user, ok := users[name]
+	if !ok {
+		return false, errors.New("not found")
+	}
+	if user.scheduledForDeletion {
+		delete(users, name)
+		return true, nil
+	}
+	return false, nil
+}
+
+type user struct {
+	name                 string
+	number               int
+	scheduledForDeletion bool
+}
+
+func main() {
+	type testCase struct {
+		users             map[string]user
+		name              string
+		expectedErrString string
+		expectedUsers     map[string]user
+		expectedDeleted   bool
+	}
+
+	runCases := []testCase{
+		{
+			map[string]user{"Erwin": {"Erwin", 14355550987, true}, "Levi": {"Levi", 98765550987, true}, "Hanji": {"Hanji", 18265554567, true}},
+			"Erwin",
+			"",
+			map[string]user{"Levi": {"Levi", 98765550987, true}, "Hanji": {"Hanji", 18265554567, true}},
+			true,
+		},
+		{
+			map[string]user{"Erwin": {"Erwin", 14355550987, false}, "Levi": {"Levi", 98765550987, false}, "Hanji": {"Hanji", 18265554567, false}},
+			"Erwin",
+			"",
+			map[string]user{"Erwin": {"Erwin", 14355550987, false}, "Levi": {"Levi", 98765550987, false}, "Hanji": {"Hanji", 18265554567, false}},
+			false,
+		},
+	}
+
+	submitCases := append(runCases, []testCase{
+		{
+			map[string]user{"Erwin": {"Erwin", 14355550987, true}, "Levi": {"Levi", 98765550987, true}, "Hanji": {"Hanji", 18265554567, true}},
+			"Eren",
+			"not found",
+			map[string]user{"Erwin": {"Erwin", 14355550987, true}, "Levi": {"Levi", 98765550987, true}, "Hanji": {"Hanji", 18265554567, true}},
+			false,
+		},
+	}...)
+
+	testCases := runCases
+	if withSubmit {
+		testCases = submitCases
+	}
+
+	skipped := len(submitCases) - len(testCases)
+
+	passCount := 0
+	failCount := 0
+
+	for _, test := range testCases {
+		originalUsers := getMapCopy(test.users)
+		deleted, err := deleteIfNecessary(test.users, test.name)
+		if test.expectedErrString != "" {
+			if err == nil {
+				failCount++
+				fmt.Printf(`---------------------------------
+Test Failed:
+  users:
+%v
+  name: %v
+  expected error: %v
+  actual error: none
+`, formatMap(originalUsers), test.name, test.expectedErrString)
+			} else if err.Error() != test.expectedErrString {
+				failCount++
+				fmt.Printf(`---------------------------------
+Test Failed:
+  users:
+%v
+  name: %v
+  expected error: %v
+  actual error: %v
+`, formatMap(originalUsers), test.name, test.expectedErrString, err)
+			} else {
+				passCount++
+				fmt.Printf(`---------------------------------
+Test Passed:
+  users:
+%v
+  name: %v
+  expected error: %v
+  actual error: %v
+`, formatMap(originalUsers), test.name, test.expectedErrString, err)
+			}
+		} else if err != nil {
+			failCount++
+			fmt.Printf(`---------------------------------
+Test Failed:
+  users:
+%v
+  name: %v
+  expected error: none
+  actual error: %v
+`, formatMap(originalUsers), test.name, err)
+		} else if !compareMaps(test.users, test.expectedUsers) {
+			failCount++
+			fmt.Printf(`---------------------------------
+Test Failed:
+  users:
+%v
+  name: %v
+  expected users:
+%v
+  actual users:
+%v
+`, formatMap(originalUsers), test.name, formatMap(test.expectedUsers), formatMap(test.users))
+		} else if deleted != test.expectedDeleted {
+			failCount++
+			fmt.Printf(`---------------------------------
+Test Failed:
+  users:
+%v
+  name: %v
+  expected deleted: %v
+  actual deleted: %v
+`, formatMap(originalUsers), test.name, test.expectedDeleted, deleted)
+		} else {
+			passCount++
+			fmt.Printf(`---------------------------------
+Test Passed:
+  users:
+%v
+  name: %v
+  expected users:
+%v
+  actual users:
+%v
+  expected deleted: %v
+  actual deleted: %v
+`, formatMap(originalUsers), test.name, formatMap(test.expectedUsers), formatMap(test.users), test.expectedDeleted, deleted)
+		}
+	}
+
+	fmt.Println("---------------------------------")
+	if skipped > 0 {
+		fmt.Printf("%d passed, %d failed, %d skipped\n", passCount, failCount, skipped)
+	} else {
+		fmt.Printf("%d passed, %d failed\n", passCount, failCount)
+	}
+
+}
+
+func getMapCopy(m map[string]user) map[string]user {
+	copy := make(map[string]user)
+	for key, value := range m {
+		copy[key] = value
+	}
+	return copy
+}
+
+func formatMap(m map[string]user) string {
+	var str string
+	for key, value := range m {
+		str += fmt.Sprintf("  * %s: %v\n", key, value)
+	}
+	return str
+}
