@@ -1,0 +1,120 @@
+package main
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+type sms struct {
+	id      string
+	content string
+	tags    []string
+}
+
+func tagMessages(messages []sms, tagger func(sms) []string) []sms {
+	if len(messages) > 0 {
+		for i, message := range messages {
+			messages[i].tags = tagger(message)
+		}
+	}
+	return messages
+}
+
+func tagger(msg sms) []string {
+	tags := []string{}
+	if strings.Contains(strings.ToLower(msg.content), "urgent") {
+		tags = append(tags, "Urgent")
+	}
+	if strings.Contains(strings.ToLower(msg.content), "sale") {
+		tags = append(tags, "Promo")
+	}
+	return tags
+}
+
+type testCase struct {
+	password string
+	isValid  bool
+}
+
+func main() {
+	withSubmit := true
+	type testCase struct {
+		messages []sms
+		expected [][]string
+	}
+
+	runCases := []testCase{
+		{
+			messages: []sms{{id: "001", content: "Urgent, please respond!"}, {id: "002", content: "Big sale on all items!"}},
+			expected: [][]string{{"Urgent"}, {"Promo"}},
+		},
+		{
+			messages: []sms{{id: "003", content: "Enjoy your day"}},
+			expected: [][]string{{}},
+		},
+	}
+
+	submitCases := append(runCases, []testCase{
+		{
+			messages: []sms{{id: "004", content: "Sale! Don't miss out on these urgent promotions!"}},
+			expected: [][]string{{"Urgent", "Promo"}},
+		},
+		{
+			messages: []sms{{id: "005", content: "i nEEd URgEnt help, my FROZEN FLAME was used"}, {id: "006", content: "wAnt to saLE 200x heavy leather"}},
+			expected: [][]string{{"Urgent"}, {"Promo"}},
+		},
+	}...)
+
+	testCases := runCases
+	if withSubmit {
+		testCases = submitCases
+	}
+
+	skipped := len(submitCases) - len(testCases)
+
+	passCount := 0
+	failCount := 0
+
+	for _, test := range testCases {
+		actual := tagMessages(test.messages, tagger)
+		if len(actual) != len(test.expected) {
+			failCount++
+			fmt.Printf(`---------------------------------
+Test Failed for length of returned sms slice
+Expecting: %v
+Actual:    %v
+Fail
+`, len(test.expected), len(actual))
+			continue
+		}
+
+		for i, msg := range actual {
+			if !reflect.DeepEqual(msg.tags, test.expected[i]) {
+				failCount++
+				fmt.Printf(`---------------------------------
+Test Failed for message ID %s
+Expecting: %v
+Actual:    %v
+Fail
+`, msg.id, test.expected[i], msg.tags)
+			} else {
+				passCount++
+				fmt.Printf(`---------------------------------
+Test Passed for message ID %s
+Expecting: %v
+Actual:    %v
+Pass
+`, msg.id, test.expected[i], msg.tags)
+			}
+		}
+	}
+
+	fmt.Println("---------------------------------")
+	if skipped > 0 {
+		fmt.Printf("%d passed, %d failed, %d skipped\n", passCount, failCount, skipped)
+	} else {
+		fmt.Printf("%d passed, %d failed\n", passCount, failCount)
+	}
+
+}
